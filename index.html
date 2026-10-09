@@ -2,271 +2,98 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi Realidad Aumentada</title>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prueba de cámara</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
+    * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
-      background: #10131c;
+      background: #111827;
       color: white;
-      overflow: hidden;
+      font-family: Arial, sans-serif;
+      text-align: center;
     }
-
-    #camara {
-      position: fixed;
-      inset: 0;
+    video {
       width: 100%;
-      height: 100%;
+      height: 72vh;
       object-fit: cover;
+      background: black;
       display: none;
     }
-
-    #escena {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-
-    #inicio {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: 25px;
-      text-align: center;
-      background: linear-gradient(145deg, #111827, #263c69);
-      z-index: 5;
-    }
-
-    h1 {
-      font-size: 30px;
-      margin-bottom: 10px;
-    }
-
-    p {
-      line-height: 1.5;
-      color: #d5dbea;
-      max-width: 350px;
-    }
-
     button {
+      padding: 15px 22px;
+      margin: 10px;
       border: 0;
-      border-radius: 30px;
-      padding: 15px 25px;
-      margin-top: 18px;
-      background: #55e6c1;
-      color: #10221f;
+      border-radius: 12px;
       font-size: 16px;
       font-weight: bold;
-      cursor: pointer;
     }
-
-    #estado {
-      position: fixed;
-      z-index: 3;
-      top: 20px;
-      left: 0;
-      width: 100%;
-      text-align: center;
-      text-shadow: 0 2px 5px black;
-      padding: 10px;
-    }
-
-    #detener {
-      position: fixed;
-      z-index: 4;
-      bottom: 25px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: none;
-      background: #ffffff;
-      color: #111827;
-    }
+    #abrir { background: #55e6c1; }
+    #cerrar { background: white; display: none; }
+    #estado { padding: 15px; overflow-wrap: anywhere; }
   </style>
 </head>
-
 <body>
+  <h2>Prueba de cámara del celular</h2>
+  <p>Presioná el botón y aceptá el permiso.</p>
 
-  <video id="camara" autoplay playsinline muted></video>
-  <canvas id="escena"></canvas>
-
-  <div id="inicio">
-    <h1>Realidad Aumentada 3D</h1>
-    <p>
-      Activá la cámara de tu celular y descubrí
-      un objeto tridimensional en tu entorno.
-    </p>
-    <button id="activar">Iniciar experiencia</button>
-    <p id="error"></p>
+  <video id="video" autoplay playsinline muted></video>
+  <div>
+    <button id="abrir">ABRIR CÁMARA</button>
+    <button id="cerrar">CERRAR CÁMARA</button>
   </div>
+  <p id="estado">Esperando para iniciar...</p>
 
-  <div id="estado">Experiencia 3D</div>
-  <button id="detener">Cerrar cámara</button>
+  <script>
+    const video = document.getElementById("video");
+    const estado = document.getElementById("estado");
+    const abrir = document.getElementById("abrir");
+    const cerrar = document.getElementById("cerrar");
+    let flujo = null;
 
-  <script type="module">
-    import * as THREE from
-      "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+    abrir.onclick = async () => {
+      estado.textContent = "Solicitando acceso a la cámara...";
 
-    const video = document.getElementById("camara");
-    const canvas = document.getElementById("escena");
-    const inicio = document.getElementById("inicio");
-    const activar = document.getElementById("activar");
-    const detener = document.getElementById("detener");
-    const error = document.getElementById("error");
-
-    let stream;
-    let renderer;
-    let camera3D;
-    let scene;
-    let objeto;
-    let animacionActiva = false;
-
-    function crearEscena() {
-      scene = new THREE.Scene();
-
-      camera3D = new THREE.PerspectiveCamera(
-        45,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        100
-      );
-
-      camera3D.position.z = 5;
-
-      renderer = new THREE.WebGLRenderer({
-        canvas: canvas,
-        alpha: true,
-        antialias: true
-      });
-
-      renderer.setPixelRatio(
-        Math.min(window.devicePixelRatio, 2)
-      );
-
-      renderer.setSize(
-        window.innerWidth,
-        window.innerHeight
-      );
-
-      // Luces del objeto 3D
-      scene.add(new THREE.AmbientLight(0xffffff, 1.5));
-
-      const luz = new THREE.DirectionalLight(0xffffff, 3);
-      luz.position.set(3, 4, 5);
-      scene.add(luz);
-
-      // Objeto 3D de ejemplo: cubo azul
-      const geometria = new THREE.BoxGeometry(1.3, 1.3, 1.3);
-
-      const material = new THREE.MeshStandardMaterial({
-        color: 0x36a5ff,
-        metalness: 0.35,
-        roughness: 0.25
-      });
-
-      objeto = new THREE.Mesh(geometria, material);
-      scene.add(objeto);
-
-      // Bordes luminosos
-      const bordes = new THREE.EdgesGeometry(geometria);
-      const lineas = new THREE.LineSegments(
-        bordes,
-        new THREE.LineBasicMaterial({ color: 0xffffff })
-      );
-
-      objeto.add(lineas);
-
-      animacionActiva = true;
-      animar();
-    }
-
-    function animar() {
-      if (!animacionActiva) return;
-
-      requestAnimationFrame(animar);
-
-      if (objeto) {
-        objeto.rotation.x += 0.008;
-        objeto.rotation.y += 0.012;
-        objeto.position.y =
-          Math.sin(Date.now() * 0.0015) * 0.12;
-      }
-
-      renderer.render(scene, camera3D);
-    }
-
-    activar.addEventListener("click", async () => {
       try {
-        error.textContent = "";
-
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }
-        });
-
-        video.srcObject = stream;
-        await video.play();
-
-        video.style.display = "block";
-        inicio.style.display = "none";
-        detener.style.display = "block";
-
-        if (!renderer) {
-          crearEscena();
-        } else {
-          animacionActiva = true;
-          animar();
+        if (!navigator.mediaDevices ||
+            !navigator.mediaDevices.getUserMedia) {
+          throw new Error(
+            "El navegador no permite acceder a la cámara aquí. " +
+            "Abrí la página mediante HTTPS."
+          );
         }
 
+        flujo = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: { ideal: "environment" } }
+        });
+
+        video.srcObject = flujo;
+        video.style.display = "block";
+        await video.play();
+
+        abrir.style.display = "none";
+        cerrar.style.display = "inline-block";
+        estado.textContent = "¡Cámara funcionando correctamente!";
+
       } catch (e) {
-        error.textContent =
-          "No se pudo abrir la cámara. Permití el acceso " +
-          "y abrí esta página desde HTTPS en tu celular.";
+        estado.textContent =
+          "Error: " + e.name + " — " + e.message +
+          ". Revisá el permiso de cámara y probá en HTTPS.";
       }
-    });
+    };
 
-    detener.addEventListener("click", () => {
-      animacionActiva = false;
-
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        stream = null;
+    cerrar.onclick = () => {
+      if (flujo) {
+        flujo.getTracks().forEach(pista => pista.stop());
+        flujo = null;
       }
-
       video.srcObject = null;
       video.style.display = "none";
-      detener.style.display = "none";
-      inicio.style.display = "flex";
-    });
-
-    window.addEventListener("resize", () => {
-      if (!renderer || !camera3D) return;
-
-      camera3D.aspect =
-        window.innerWidth / window.innerHeight;
-
-      camera3D.updateProjectionMatrix();
-
-      renderer.setSize(
-        window.innerWidth,
-        window.innerHeight
-      );
-    });
+      cerrar.style.display = "none";
+      abrir.style.display = "inline-block";
+      estado.textContent = "Cámara cerrada.";
+    };
   </script>
-
 </body>
 </html>
